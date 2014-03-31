@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 41;
+use Test::More tests    => 47;
 use Encode qw(decode encode);
 
 
@@ -48,6 +48,56 @@ my $tnt = DR::Tarantool::CoroClient->connect(
                 0   => 'id',
                 1   => [ 'key', 'id' ]
             }
+        },
+
+        100 => {
+                default_type => 'UTF8STR',
+                name => 'old_lp',
+                fields => [
+                    {
+                        name => 'id',
+                        type => 'NUM64',
+                    },
+                    {
+                        name => 'e1',
+                        type => 'UTF8STR',
+                    },
+                    {
+                        name => 'e2',
+                        type => 'UTF8STR',
+                    },
+                    {
+                        name => 'e3',
+                        type => 'UTF8STR',
+                    },
+                    {
+                        name => 'e4',
+                        type => 'UTF8STR',
+                    },
+                    {
+                        name => 'e5',
+                        type => 'UTF8STR',
+                    },
+                    {
+                        name => 'type',
+                        type => 'STR',
+                    },
+                    {
+                        name => 'klen',
+                        type => 'NUM',
+                    },
+                    {
+                        name => 'created',
+                        type => 'NUM64',
+                    },
+                    {
+                        name => 'data',
+                        type => 'UTF8STR',
+                    },
+                ],
+                indexes => {
+                    0 => 'id',
+                }
         }
     },
 );
@@ -133,7 +183,24 @@ ok $tnt->ping, 'tnt->ping';
             [ 'test1', 1, 'test2', 2, 'test3', 3 ], 'lp')->raw,
         [ 3 ],
         'put_list';
+}
 
+{
+    my $tp = $tnt->call_lua('lp.old_put',
+        [ 2, 'abc', 'cde', 'data' ], 'old_lp');
+
+
+    my $tpc = $tnt->call_lua(
+        'lp.old_take', [ $tp->id, 10, 2 => 'abc', 'cde' ], 'old_lp');
+    is_deeply $tpc->raw, $tp->raw, 'put and take tuples are the same';
+
+    my $tpcto = $tnt->call_lua(
+        'lp.old_take', [ $tp->id + 2, .1, 2 => 'abc', 'cde' ], 'old_lp');
+    
+    is $tpcto->data, undef, 'data (timeout)';
+    is $tpcto->type, 't', 'type (timeout)';
+    is $tpcto->klen, 0, 'key length (timeout)';
+    is $tpcto->iter->count, 1, 'count of events (timeout)';
 }
 
 END{
