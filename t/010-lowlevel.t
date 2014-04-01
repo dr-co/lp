@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 47;
+use Test::More tests    => 53;
 use Encode qw(decode encode);
 
 
@@ -22,11 +22,12 @@ BEGIN {
     use_ok 'DR::Tarantool::CoroClient';
     use_ok 'Coro';
     use_ok 'Coro::AnyEvent';
+    use_ok 'File::Spec::Functions', 'rel2abs';
 }
 
 my $tserver = DR::Tarantool::StartTest->run(
     cfg         => 'lp.tarantool.cfg',
-    script_dir  => '.',
+    script_dir  => rel2abs('.'),
 );
 
 
@@ -196,6 +197,23 @@ ok $tnt->ping, 'tnt->ping';
 
     my $tpcto = $tnt->call_lua(
         'lp.old_take', [ $tp->id + 2, .1, 2 => 'abc', 'cde' ], 'old_lp');
+    
+    is $tpcto->data, undef, 'data (timeout)';
+    is $tpcto->type, 't', 'type (timeout)';
+    is $tpcto->klen, 0, 'key length (timeout)';
+    is $tpcto->iter->count, 1, 'count of events (timeout)';
+}
+{
+    my $tp = $tnt->call_lua('lp2.put',
+        [ 2, 'ab', 'cde', 'data' ], 'old_lp');
+
+
+    my $tpc = $tnt->call_lua(
+        'lp2.take', [ $tp->id, 10, 2 => 'ab', 'cde' ], 'old_lp');
+    is_deeply $tpc->raw, $tp->raw, 'put and take tuples are the same';
+
+    my $tpcto = $tnt->call_lua(
+        'lp2.take', [ $tp->id + 2, .1, 2 => 'ab', 'cde' ], 'old_lp');
     
     is $tpcto->data, undef, 'data (timeout)';
     is $tpcto->type, 't', 'type (timeout)';
