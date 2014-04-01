@@ -152,6 +152,8 @@ return {
             
             if tonumber64(id) == tonumber64(0) then
                 id = last_id + tonumber64(1)
+            elseif tonumber64(id) > last_id then
+                id = last_id + tonumber64(1)
             end
 
             id = box.pack('l', tonumber64(id))
@@ -230,6 +232,14 @@ return {
                 end
             end
         )
+
+        do
+            local max = box.space[space].index[0]:max()
+            if max ~= nil then
+                last_id = box.unpack('l', max[ID])
+            end
+        end
+
 
         return self
     end
