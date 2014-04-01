@@ -5,7 +5,7 @@ return {
         local TIME              = 1
         local KEY               = 2
         local DATA              = 3
-        local EXPIRE_TIMEOUT    = 180
+        local EXPIRE_TIMEOUT    = 1800
 
         space = tonumber(space)
         if expire_timeout ~= nil then

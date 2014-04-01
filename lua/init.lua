@@ -1,1 +1,1 @@
-lp = (require 'lp_old').new(0, 2, true)
+lp = (require 'lp_old').new(0, 1800, true)
