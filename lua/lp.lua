@@ -214,6 +214,28 @@ return {
         end
 
 
+        self.stat = function()
+            local tuples = {}
+            local clients = 0
+            for i in pairs(chs) do
+                clients = clients + 1
+            end
+            clients = tostring(clients)
+
+            local keys = 0
+            for i in pairs(waiters) do
+                keys = keys + 1
+            end
+
+            table.insert(tuples, box.tuple.new{'pool', tostring(#pool_chs)})
+            table.insert(tuples, box.tuple.new{'clients', clients})
+            table.insert(tuples,
+                box.tuple.new{'expire_timeout', tostring(expire_timeout)})
+            table.insert(tuples, box.tuple.new{'keys', tostring(keys)})
+            return tuples
+        end
+
+
         -- cleanup process
         box.fiber.wrap(
             function()
