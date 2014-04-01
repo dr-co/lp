@@ -19,7 +19,22 @@ return {
         local pool_chs          = {}    -- channel_pool
         local waiters           = {}    -- waiters
         local last_id           = tonumber64(0)
-        
+
+        local function channel()
+            if #pool_chs > 0 then
+                local ch = pool_chs[ #pool_chs ]
+                pool_chs[ #pool_chs ] = nil
+                return ch
+            end
+            return box.ipc.channel(1)
+        end
+        local function drop_channel(id)
+            if chs[id] == nil then
+                return
+            end
+            table.insert(pool_chs, chs[id])
+            chs[id] = nil
+        end
 
         local function sprintf(fmt, ...) return string.format(fmt, ...) end
         local function printf(fmt, ...) print(sprintf(fmt, ...)) end
@@ -79,7 +94,7 @@ return {
                     waiters[key][fid] = nil
                     if chs[fid] ~= nil then
                         chs[fid]:put(true)
-                        chs[fid] = nil
+                        drop_channel(fid)
                     end
                 end
                 waiters[key] = nil
@@ -153,7 +168,7 @@ return {
             end
 
             local fid = box.fiber.id()
-            chs[ fid ] = box.ipc.channel(1)
+            chs[ fid ] = channel()
 
             for i, key in pairs(keys) do
                 if waiters[key] == nil then
@@ -163,7 +178,7 @@ return {
             end
 
             chs[ fid ]:get(timeout)
-            chs[ fid ] = nil
+            drop_channel(fid)
             
             events = _take(id, keys)
            
