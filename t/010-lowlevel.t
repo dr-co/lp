@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 53;
+use Test::More tests    => 54;
 use Encode qw(decode encode);
 
 
@@ -219,6 +219,12 @@ ok $tnt->ping, 'tnt->ping';
     is $tpcto->type, 't', 'type (timeout)';
     is $tpcto->klen, 0, 'key length (timeout)';
     is $tpcto->iter->count, 1, 'count of events (timeout)';
+}
+
+{
+    my %stat = map { ($_->raw(0), $_->raw(1)) }
+        $tnt->call_lua('lp.stat', [])->iter->all;
+    ok exists $stat{clients}, 'clients in stat';
 }
 
 END{
