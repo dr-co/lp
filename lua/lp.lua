@@ -60,11 +60,11 @@ return {
 
         -- cleanup space iteration
         local function cleanup_space()
-            local iter = box.space[space].index[0]
-                            :iterator(box.index.GE, box.pack('l', 0))
 
             local now = box.time()
             while true do
+                local iter = box.space[space].index[0]
+                                :iterator(box.index.GE, box.pack('l', 0))
                 local lst = {}
                 for tuple in iter do
                     if box.unpack('i', tuple[TIME]) + expire_timeout > now then
@@ -80,7 +80,7 @@ return {
                     break
                 end
 
-                for id, num in pairs(lst) do
+                for num, id in pairs(lst) do
                     box.delete(space, id)
                 end
             end
