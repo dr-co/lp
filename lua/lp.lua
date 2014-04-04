@@ -62,6 +62,7 @@ return {
         local function cleanup_space()
 
             local now = box.time()
+            local count = 0
             while true do
                 local iter = box.space[space].index[0]
                                 :iterator(box.index.GE, box.pack('l', 0))
@@ -82,8 +83,10 @@ return {
 
                 for num, id in pairs(lst) do
                     box.delete(space, id)
+                    count = count + 1
                 end
             end
+            return count
         end
 
         -- wakeup waiters
@@ -233,6 +236,10 @@ return {
                 box.tuple.new{'expire_timeout', tostring(expire_timeout)})
             table.insert(tuples, box.tuple.new{'keys', tostring(keys)})
             return tuples
+        end
+
+        self.cleanup = function()
+            return cleanup_space()
         end
 
 
