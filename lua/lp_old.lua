@@ -1,15 +1,11 @@
 return {
-    new = function(space, expire_timeout, inherit)
+    new = function(space, expire_timeout)
         local ID                = 0
         local TIME              = 1
         local KEY               = 2
         local DATA              = 3
         local lp = require 'lp'
         
-        if inherit == nil then
-            inherit = false
-        end
-
         -- split string
         local function strsplit(str, sep)
             local res = {}
@@ -27,19 +23,8 @@ return {
         
         local self = lp.new(space, expire_timeout)
 
-        local putfoo = self.put
-        local takefoo = self.take
-
-        local putname = 'old_put'
-        local takename = 'old_take'
-
-        if inherit then
-            putname = 'put'
-            takename = 'take'
-        end
-
         -- old style put(klen, skey[1], .. skey[klen], data)
-        self[putname] = function(klen, ...)
+        self.put = function(klen, ...)
             klen = tonumber(klen)
             local key = {}
             for i = 1, klen do
@@ -48,7 +33,7 @@ return {
             end
             local data = select(klen + 1, ...)
             key = table.concat(key, '::')
-            local event = putfoo(key, data)
+            local event = self.push(key, data)
 
             key = strsplit(event[KEY], '::')
             while #key < 5 do
@@ -66,7 +51,7 @@ return {
 
         end
 
-        self[takename] = function(id, timeout, ...)
+        self.take = function(id, timeout, ...)
             local args = { ... }
             local takeargs = {}
             while #args > 0 do
@@ -81,7 +66,7 @@ return {
                 table.insert(takeargs, data)
             end
 
-            local events = takefoo(id, timeout, unpack(takeargs))
+            local events = self.subscribe(id, timeout, unpack(takeargs))
 
             for i, event in pairs(events) do
                 local key

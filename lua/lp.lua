@@ -50,11 +50,17 @@ return {
                     if tuple[KEY] ~= key then
                         break
                     end
-                    table.insert(res, tuple)
+                    table.insert(res, { box.unpack('l', tuple[ID]), tuple })
                 end
             end
+            table.sort(res, function(a, b) return a[1] < b[1] end)
+            local result = {}
 
-            return res
+            for i, v in pairs(res) do
+                table.insert(result, v[2])
+            end
+
+            return result
         end
 
 
@@ -125,13 +131,12 @@ return {
         end
 
         -- put task
-        self.put = function(key, data)
+        self.push = function(key, data)
             return put_task(key, data, true)
         end
 
         -- put some tasks
-        self.put_list = function(...)
-            
+        self.push_list = function(...)
             local put = {...}
             local keys = {}
             local i = 1
@@ -149,8 +154,8 @@ return {
             return box.pack('l', #keys)
         end
 
-        -- take tasks
-        self.take = function(id, timeout, ...)
+        -- subscribe tasks
+        self.subscribe = function(id, timeout, ...)
             local keys = {...}
             
             if tonumber64(id) == tonumber64(0) then
@@ -268,7 +273,6 @@ return {
                 last_id = box.unpack('l', max[ID])
             end
         end
-
 
         return self
     end
