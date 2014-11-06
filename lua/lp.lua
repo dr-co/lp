@@ -54,6 +54,8 @@ return {
         local function printf(fmt, ...) print(sprintf(fmt, ...)) end
 
         local function _take(id, keys)
+
+            id = box.pack('l', id)
             local res = {}
 
             for i, key in pairs(keys) do
@@ -181,7 +183,7 @@ return {
                 id = last_id() + tonumber64(1)
             end
 
-            id = box.pack('l', tonumber64(id))
+            id = tonumber64(id)
 
             local events = _take(id, keys)
 
@@ -236,11 +238,12 @@ return {
                 end
             end
 
+            if id <= last_id() then
+                id = last_id() + tonumber64(1)
+            end
+
             -- last tuple always contains time
-            table.insert(
-                events,
-                box.tuple.new{ box.pack('l', last_id() + tonumber64(1)) }
-            )
+            table.insert(events, box.tuple.new{ box.pack('l', id) })
             return events
         end
 
