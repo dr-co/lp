@@ -1,3 +1,4 @@
+require 'on_lsn'
 return {
     new = function(space, expire_timeout)
         -- constants
@@ -18,7 +19,20 @@ return {
         local chs               = {}    -- channels
         local pool_chs          = {}    -- channel_pool
         local waiters           = {}    -- waiters
-        local last_id           = tonumber64(0)
+
+
+        local _last_id = tonumber64(0)
+        local last_id
+        local last_checked_id = tonumber64(0)
+
+        last_id = function()
+            local max = box.space[space].index[0]:max()
+            if max == nil then
+                return _last_id
+            end
+            _last_id = box.unpack('l', max[ID])
+            return _last_id
+        end
 
         local function channel()
             if #pool_chs > 0 then
@@ -110,104 +124,122 @@ return {
             end
         end
 
-        local function put_task(key, data, wakeup)
-            last_id = last_id + tonumber64(1)
+
+        local function on_change_lsn(lsn)
+            local iter = box.space[space].index[0]
+                        :iterator(box.index.GE, box.pack('l', last_checked_id))
+
+            for tuple in iter do
+                last_checked_id = box.unpack('l', tuple[ID])
+                wakeup_waiters(tuple[KEY])
+            end
+        end
+
+        box.on_change_lsn(on_change_lsn)
+
+        local function put_task(key, data)
 
             local time = box.pack('i', math.floor(box.time()))
 
             local task
             if data ~= nil then
                 task = box.insert(space,
-                    box.pack('l', last_id), time, key, data)
+                    box.pack('l', last_id() + 1), time, key, data)
             else
-                task = box.insert(space, box.pack('l', last_id), time, key)
+                task = box.insert(space, box.pack('l', last_id() + 1), time, key)
             end
-
-            if wakeup then
-                wakeup_waiters(key)
-            end
-
+            
             return task
         end
 
         -- put task
         self.push = function(key, data)
-            return put_task(key, data, true)
+            return put_task(key, data)
         end
 
         -- put some tasks
         self.push_list = function(...)
             local put = {...}
-            local keys = {}
             local i = 1
+            local count = 0
             while i <= #put do
                 local key = put[ i ]
                 local data = put[ i + 1 ]
                 i = i + 2
-                put_task(key, data, false)
-                table.insert(keys, key)
+                count = count + 1
+                put_task(key, data)
             end
 
-            for idx, key in pairs(keys) do
-                wakeup_waiters(key)
-            end
-            return box.pack('l', #keys)
+            return box.pack('l', count)
         end
 
         -- subscribe tasks
         self.subscribe = function(id, timeout, ...)
             local keys = {...}
-            
+
             if tonumber64(id) == tonumber64(0) then
-                id = last_id + tonumber64(1)
-            elseif tonumber64(id) > last_id then
-                id = last_id + tonumber64(1)
+                id = last_id() + tonumber64(1)
             end
 
             id = box.pack('l', tonumber64(id))
-            
-            timeout = tonumber(timeout)
+
             local events = _take(id, keys)
-            
+
             if #events > 0 then
                 table.insert(
                     events,
-                    box.tuple.new{ box.pack('l', last_id + tonumber64(1)) }
+                    box.tuple.new{ box.pack('l', last_id() + tonumber64(1)) }
                 )
                 return events
             end
 
+            timeout = tonumber(timeout)
+            local started
             local fid = box.fiber.id()
-            chs[ fid ] = channel()
 
-            for i, key in pairs(keys) do
-                if waiters[key] == nil then
-                    waiters[key] = {}
+            while timeout > 0 do
+                started = box.time()
+                
+                chs[ fid ] = channel()
+
+                for i, key in pairs(keys) do
+                    if waiters[key] == nil then
+                        waiters[key] = {}
+                    end
+                    waiters[key][fid] = true
                 end
-                waiters[key][fid] = true
+
+                chs[ fid ]:get(timeout)
+                drop_channel(fid)
+
+
+                for i, key in pairs(keys) do
+                    if waiters[key] ~= nil then
+                        waiters[key][fid] = nil
+                        local empty = false
+                        for i in pairs(waiters[key]) do
+                            empty = false
+                            break
+                        end
+                        if empty then
+                            waiters[key] = nil
+                        end
+                    end
+                end
+
+
+                timeout = timeout - (box.time() - started)
+
+                events = _take(id, keys)
+                if #events > 0 then
+                    break
+                end
             end
 
-            chs[ fid ]:get(timeout)
-            drop_channel(fid)
-            
-            events = _take(id, keys)
-           
-            for i, key in pairs(keys) do
-                if waiters[key] ~= nil then
-                    waiters[key][fid] = nil
-                    local empty = false
-                    for i in pairs(waiters[key]) do
-                        empty = false
-                        break
-                    end
-                    if empty then
-                        waiters[key] = nil
-                    end
-                end
-            end
+            -- last tuple always contains time
             table.insert(
                 events,
-                box.tuple.new{ box.pack('l', last_id + tonumber64(1)) }
+                box.tuple.new{ box.pack('l', last_id() + tonumber64(1)) }
             )
             return events
         end
@@ -266,13 +298,6 @@ return {
                 end
             end
         )
-
-        do
-            local max = box.space[space].index[0]:max()
-            if max ~= nil then
-                last_id = box.unpack('l', max[ID])
-            end
-        end
 
         return self
     end

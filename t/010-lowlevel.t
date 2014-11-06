@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 54;
+use Test::More tests    => 56;
 use Encode qw(decode encode);
 
 
@@ -23,6 +23,7 @@ BEGIN {
     use_ok 'Coro';
     use_ok 'Coro::AnyEvent';
     use_ok 'File::Spec::Functions', 'rel2abs';
+    use_ok 'Coro::Channel';
 }
 
 my $tserver = DR::Tarantool::StartTest->run(
@@ -139,7 +140,8 @@ ok $tnt->ping, 'tnt->ping';
     is $list2->iter->get(1)->data, 'data2', 'data2';
 
     note 'id > max';
-    my $list3 = $tnt->call_lua('lp.subscribe', [ $task2->id + 1, .1, 'test' ], 'lp');
+    my $list3 = $tnt->call_lua('lp.subscribe',
+        [ $task2->id + 1, .1, 'test' ], 'lp');
     is $list3->iter->count, 1, 'items';
     is $list3->iter->get(-1)->id, $task2->id + 1, 'last id';
     is $list3->iter->get(-1)->key, undef, 'no key in last tuple';
@@ -150,7 +152,8 @@ ok $tnt->ping, 'tnt->ping';
     is $list3->iter->get(-1)->key, undef, 'no key in last tuple';
 
     note 'id > min';
-    my $list4 = $tnt->call_lua('lp.subscribe', [ $task1->id + 1, .1, 'test' ], 'lp');
+    my $list4 = $tnt->call_lua('lp.subscribe',
+        [ $task1->id + 1, .1, 'test' ], 'lp');
     is $list4->iter->count, 2, 'items';
     is $list4->iter->get(-1)->id, $task2->id + 1, 'last id';
     is $list4->iter->get(-1)->key, undef, 'no key in last tuple';
@@ -158,7 +161,8 @@ ok $tnt->ping, 'tnt->ping';
 
     note 'expiration tests';
     Coro::AnyEvent::sleep 2.2;
-    my $list_e = $tnt->call_lua('lp.subscribe', [ 1, .1, 'abc', 'test' ] => 'lp');
+    my $list_e = $tnt->call_lua('lp.subscribe',
+        [ 1, .1, 'abc', 'test' ] => 'lp');
     is $list_e->iter->count, 1, 'all items were deleted by expire fiber';
 }
 
@@ -171,19 +175,31 @@ ok $tnt->ping, 'tnt->ping';
     is $list->iter->count, 1, 'no tasks in space';
     is $list->id, 3, 'last id';
 
+    my $ch = new Coro::Channel 1;
+
+    my $started = AnyEvent::now;
+
     async {
-        my $list = $tnt->call_lua('lp.subscribe', [ 3, 3, 'test1', 'test3' ], 'lp');
+        my $list = $tnt->call_lua('lp.subscribe',
+            [ 3, 3, 'test1', 'test3' ], 'lp');
         note 'take (woke up)';
         is $list->iter->count, 3, 'items';
+        $ch->put;
     };
 
-    Coro::AnyEvent::sleep .4;
+    Coro::AnyEvent::sleep .1;
     note 'put tasks';
     is_deeply
         $tnt->call_lua('lp.push_list',
             [ 'test1', 1, 'test2', 2, 'test3', 3 ], 'lp')->raw,
         [ 3 ],
         'put_list';
+
+    $ch->get;
+
+    my $finished = AnyEvent::now;
+
+    cmp_ok $finished - $started,  '<', 0.5, 'subscribe returns data faster';
 }
 
 
