@@ -6,7 +6,7 @@ use utf8;
 use open qw(:std :utf8);
 use lib qw(lib ../lib);
 
-use Test::More tests    => 43;
+use Test::More tests    => 52;
 use Encode qw(decode encode);
 
 
@@ -212,5 +212,42 @@ note 'max id';
 
     is $list->iter->count, 1, '1 (no) items';
     is $list->id, 517, 'id is not changed';
+}
+
+$id++;
+
+for my $channel (Coro::Channel->new(128)) {
+    my $count = 0;
+
+    async {
+        my $started = AnyEvent::now();
+        my $list =
+            $tntr->call_lua('lp.subscribe',
+                [ 519, .2, 'abc', 'test' ] => 'lp');
+        my $finished = AnyEvent::now();
+
+        cmp_ok $finished - $started, '>=', 0.2, 'timeout reached';
+
+        is $list->iter->count, 1, '1 (no) items';
+        is $list->id, 519, 'id is not changed';
+        $channel->put(1);
+    }, $count++;
+    
+    async {
+        my $list =
+            $tntr->call_lua('lp.subscribe', [ 0, .2, 'abc', 'test' ] => 'lp');
+        note 'replica received task';
+        is $list->iter->count, 2, '2 items';
+
+        is_deeply [ @{ $list->iter->item(0)->raw }[2, 3] ], ['abc', 'cde'],
+            'event data';
+        is $list->iter->item(-1)->id, $id + 1, 'id is incremented';
+        $channel->put(1);
+    }, $count++;
+
+    my $task =  $tnt->call_lua('lp.push', [ 'abc', '"cde"' ] => 'lp');
+    is $task->data, 'cde', 'task->data';
+
+    ok $channel->get, "async $_ is done", for 1 .. $count;
 }
 
