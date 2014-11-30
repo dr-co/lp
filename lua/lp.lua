@@ -286,15 +286,19 @@ return {
         -- cleanup process
         box.fiber.wrap(
             function()
-                printf("Starting cleanup fiber for space %s (period %d sec)",
-                    space, expire_timeout)
+                box.fiber.name('expired')
+                printf("Start cleanup fiber for space %s (period %d sec): %s",
+                    space, expire_timeout, box.info.status)
                 while true do
-                    local min = box.space[space].index[0]:min()
-                    local now = math.floor( box.time() )
-                    if min ~= nil then
-                        local et = box.unpack('i', min[TIME]) + expire_timeout
-                        if et <= now then
-                            cleanup_space()
+                    if box.info.status == 'primary' then
+                        local min = box.space[space].index[0]:min()
+                        local now = math.floor( box.time() )
+                        if min ~= nil then
+                            local et =
+                                box.unpack('i', min[TIME]) + expire_timeout
+                            if et <= now then
+                                cleanup_space()
+                            end
                         end
                     end
                     box.fiber.sleep(expire_timeout / 10)
