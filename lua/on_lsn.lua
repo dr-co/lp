@@ -32,7 +32,6 @@ local function watcher()
 
             for i, cb in pairs(triggers) do
 
-                print('on_lsn')
                 local s, e = pcall(cb, last_lsn)
                 if not s then
                     log(e)
