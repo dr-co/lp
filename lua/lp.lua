@@ -128,12 +128,23 @@ return {
 
 
         local function on_change_lsn(lsn)
-            local iter = box.space[space].index[0]
-                        :iterator(box.index.GE, box.pack('l', last_checked_id))
+            local do_check = true
+            while do_check do
+                local iter =
+                    box.space[space].index[0]
+                        :iterator(
+                            box.index.GT,
+                            box.pack('l', last_checked_id))
 
-            for tuple in iter do
-                last_checked_id = box.unpack('l', tuple[ID])
-                wakeup_waiters(tuple[KEY])
+                -- поскольку может что-то заилдиться
+                -- то циклимся пока не получится что
+                -- все ожидающие разбужены
+                do_check = false
+                for tuple in iter do
+                    last_checked_id = box.unpack('l', tuple[ID])
+                    wakeup_waiters(tuple[KEY])
+                    do_check = true
+                end
             end
         end
 
