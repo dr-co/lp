@@ -128,23 +128,15 @@ return {
 
 
         local function on_change_lsn(lsn)
-            local do_check = true
-            while do_check do
-                local iter =
-                    box.space[space].index[0]
-                        :iterator(
-                            box.index.GT,
-                            box.pack('l', last_checked_id))
-
-                -- поскольку может что-то заилдиться
-                -- то циклимся пока не получится что
-                -- все ожидающие разбужены
-                do_check = false
-                for tuple in iter do
-                    last_checked_id = box.unpack('l', tuple[ID])
-                    wakeup_waiters(tuple[KEY])
-                    do_check = true
+            local tuple
+            while true do
+                last_checked_id = last_checked_id + tonumber64(1)
+                tuple = box.select(space, 0, last_checked_id)
+                if tuple == nil then
+                    last_checked_id = last_checked_id - tonumber64(1)
+                    break
                 end
+                wakeup_waiters(tuple[KEY])
             end
         end
 
@@ -316,6 +308,13 @@ return {
                 end
             end
         )
+
+        local max = box.space[space].index[0]:max()
+        if max ~= nil then
+            last_checked_id = box.unpack('l', max[ID])
+            max = nil
+        end
+
 
         return self
     end
