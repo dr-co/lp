@@ -114,15 +114,17 @@ return {
         -- wakeup waiters
         local function wakeup_waiters(key)
             if waiters[key] ~= nil then
+                local wlist = waiters[key]
+                waiters[key] = nil
                 -- wakeup waiters
-                for fid in pairs(waiters[key]) do
-                    waiters[key][fid] = nil
+                for fid in pairs(wlist) do
+                    wlist[fid] = nil
                     if chs[fid] ~= nil then
-                        chs[fid]:put(true)
+                        local ch = chs[fid]
                         drop_channel(fid)
+                        ch:put(true)
                     end
                 end
-                waiters[key] = nil
             end
         end
 
@@ -214,9 +216,10 @@ return {
                     waiters[key][fid] = true
                 end
 
-                chs[ fid ]:get(timeout)
-                drop_channel(fid)
-
+                if chs[ fid ]:get(timeout) == nil then
+                    -- drop channel if nobody puts into
+                    drop_channel(fid)
+                end
 
                 for i, key in pairs(keys) do
                     if waiters[key] ~= nil then
