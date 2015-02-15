@@ -220,12 +220,16 @@ return {
                 if chs[ fid ]:get(timeout) == nil then
                     -- drop channel if nobody puts into
                     drop_channel(fid)
+                    events = _take(id, keys)
+                    break
                 end
 
                 for i, key in pairs(keys) do
                     if waiters[key] ~= nil then
                         waiters[key][fid] = nil
-                        local empty = false
+
+                        -- memory leak if app uses unique keys
+                        local empty = true
                         for i in pairs(waiters[key]) do
                             empty = false
                             break
