@@ -46,7 +46,7 @@ return {
             if chs[id] == nil then
                 return
             end
---             table.insert(pool_chs, chs[id])
+            table.insert(pool_chs, chs[id])
             chs[id] = nil
         end
 
