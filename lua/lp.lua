@@ -131,14 +131,12 @@ return {
 
         local function on_change_lsn(lsn)
             local tuple
-            while true do
+            while last_checked_id < last_id() do
                 last_checked_id = last_checked_id + tonumber64(1)
-                tuple = box.select(space, 0, last_checked_id)
-                if tuple == nil then
-                    last_checked_id = last_checked_id - tonumber64(1)
-                    break
+                tuple = box.select(space, 0, box.pack('l', last_checked_id))
+                if tuple ~= nil then
+                    wakeup_waiters(tuple[KEY])
                 end
-                wakeup_waiters(tuple[KEY])
             end
         end
 

@@ -2,7 +2,7 @@ local triggers = {}
 
 local last_log_time = 0
 local log_min_delay = 1
-local watch_period  = 0.1
+local watch_period  = .1
 
 local last_lsn = box.info.lsn
 
@@ -24,6 +24,7 @@ end
 
 local function watcher()
     box.fiber.name("on_lsn")
+    print('Start fiber')
 
     while true do
         box.fiber.sleep(watch_period)
