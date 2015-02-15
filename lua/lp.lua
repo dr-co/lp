@@ -207,9 +207,8 @@ return {
 
             while timeout > 0 do
                 started = box.time()
-                
-                chs[ fid ] = channel()
 
+                -- set waiter fid
                 for i, key in pairs(keys) do
                     if waiters[key] == nil then
                         waiters[key] = {}
@@ -217,13 +216,13 @@ return {
                     waiters[key][fid] = true
                 end
 
+                chs[ fid ] = channel()
                 if chs[ fid ]:get(timeout) == nil then
                     -- drop channel if nobody puts into
                     drop_channel(fid)
-                    events = _take(id, keys)
-                    break
                 end
 
+                -- clean waiter fid
                 for i, key in pairs(keys) do
                     if waiters[key] ~= nil then
                         waiters[key][fid] = nil
