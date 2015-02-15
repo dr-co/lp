@@ -184,11 +184,12 @@ return {
         self.subscribe = function(id, timeout, ...)
             local keys = {...}
 
-            if tonumber64(id) == tonumber64(0) then
-                id = last_id() + tonumber64(1)
-            end
-
             id = tonumber64(id)
+            
+            if id == tonumber64(0) then
+                id = last_id() + tonumber64(1)
+                id = tonumber64(id)
+            end
 
             local events = _take(id, keys)
 
@@ -202,7 +203,7 @@ return {
 
             timeout = tonumber(timeout)
             local started
-            local fid = box.fiber.id()
+            local fid = box.fiber.self():id()
 
             while timeout > 0 do
                 started = box.time()
