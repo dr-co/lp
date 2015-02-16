@@ -35,12 +35,11 @@ return {
         end
 
         local function channel()
-            if #pool_chs > 0 then
-                local ch = pool_chs[ #pool_chs ]
-                pool_chs[ #pool_chs ] = nil
-                return ch
+            local ch = table.remove(pool_chs, 1)
+            if ch == nil then
+                ch = box.ipc.channel(1)
             end
-            return box.ipc.channel(1)
+            return ch
         end
         local function drop_channel(id)
             if chs[id] == nil then
