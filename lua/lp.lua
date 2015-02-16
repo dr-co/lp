@@ -280,11 +280,11 @@ return {
                 keys = keys + 1
             end
 
-            table.insert(tuples, box.tuple.new{'pool', tostring(#pool_chs)})
+            table.insert(tuples, box.tuple.new{'pool_channels', tostring(#pool_chs)})
             table.insert(tuples, box.tuple.new{'clients', clients})
             table.insert(tuples,
                 box.tuple.new{'expire_timeout', tostring(expire_timeout)})
-            table.insert(tuples, box.tuple.new{'keys', tostring(keys)})
+            table.insert(tuples, box.tuple.new{'work_keys', tostring(keys)})
             return tuples
         end
 
