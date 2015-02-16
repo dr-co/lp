@@ -246,5 +246,5 @@ note 'old interface';
 }
 
 END{
-#     note $tserver->log;
+    note $tserver->log if $ENV{LOG};
 }

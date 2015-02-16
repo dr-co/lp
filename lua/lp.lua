@@ -153,7 +153,7 @@ return {
             else
                 task = box.insert(space, box.pack('l', last_id() + 1), time, key)
             end
-            
+
             return task
         end
 
@@ -183,7 +183,7 @@ return {
             local keys = {...}
 
             id = tonumber64(id)
-            
+
             if id == tonumber64(0) then
                 id = last_id() + tonumber64(1)
                 id = tonumber64(id)
