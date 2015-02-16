@@ -113,7 +113,7 @@ return {
 
         -- wakeup waiters
         local function wakeup_waiters(key)
-            if waiters[key] ~= nil then
+            while waiters[key] ~= nil do
                 local wlist = waiters[key]
                 waiters[key] = nil
                 -- wakeup waiters
