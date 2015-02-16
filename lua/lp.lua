@@ -35,6 +35,9 @@ return {
         end
 
         local function channel()
+            if #pool_chs < 1024 then
+                return box.ipc.channel(1)
+            end
             local ch = table.remove(pool_chs, 1)
             if ch == nil then
                 ch = box.ipc.channel(1)
