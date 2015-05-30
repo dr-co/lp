@@ -195,9 +195,14 @@ return {
 
             id = tonumber64(id)
 
+            -- Инициализация: если 0 - сразу возвращаем ID/MinID
             if id == tonumber64(0) then
-                id = last_id() + tonumber64(1)
-                id = tonumber64(id)
+                return {
+                    box.tuple.new{
+                        box.pack('l', last_id() + tonumber64(1)),
+                        box.pack('l', first_id())    
+                    }
+                }
             end
 
             local events = _take(id, keys)

@@ -91,6 +91,19 @@ my $tntr = DR::Tarantool::CoroClient->connect(
 );
 ok $tntr->ping, 'tntr->ping';
 
+sub subscribe_m {
+    my ($id, $timeout, @keys) = @_;
+    my $r = $tnt->call_lua('lp.subscribe', [ $id, $timeout, @keys] => 'lp');
+    return $r if $id;
+    $tnt->call_lua('lp.subscribe', [ $r->iter->item(-1)->id, $timeout, @keys] => 'lp');
+}
+
+sub subscribe_r {
+    my ($id, $timeout, @keys) = @_;
+    my $r = $tntr->call_lua('lp.subscribe', [ $id, $timeout, @keys] => 'lp');
+    return $r if $id;
+    $tntr->call_lua('lp.subscribe', [ $r->iter->item(-1)->id, $timeout, @keys] => 'lp');
+}
 
 note 'master-replica test';
 my $id = 1;
@@ -99,8 +112,7 @@ for my $channel (Coro::Channel->new(128)) {
     is $task->data, 'data1', 'task->data';
 
     async {
-        my $list =
-            $tnt->call_lua('lp.subscribe', [ 1, .1, 'abc', 'test' ] => 'lp');
+        my $list = subscribe_m(1, .1, 'abc', 'test');
         note 'master';
         is $list->iter->count, 2, '2 items';
 
@@ -131,8 +143,7 @@ for my $channel (Coro::Channel->new(128)) {
 
     my $count = 0;
     async {
-        my $list =
-            $tnt->call_lua('lp.subscribe', [ 0, .2, 'abc', 'test' ] => 'lp');
+        my $list = subscribe_m(0, .2, 'abc', 'test');
         note 'master received task';
         is $list->iter->count, 2, '2 items';
 
@@ -165,8 +176,7 @@ for my $channel (Coro::Channel->new(128)) {
     }, $count++;
 
     async {
-        my $list =
-            $tntr->call_lua('lp.subscribe', [ 0, .2, 'abc', 'test' ] => 'lp');
+        my $list = subscribe_r(0, .2, 'abc', 'test');
         note 'replica received task';
         is $list->iter->count, 2, '2 items';
 
@@ -216,6 +226,7 @@ note 'max id';
 
 $id++;
 
+
 for my $channel (Coro::Channel->new(128)) {
     my $count = 0;
 
@@ -234,8 +245,7 @@ for my $channel (Coro::Channel->new(128)) {
     }, $count++;
     
     async {
-        my $list =
-            $tntr->call_lua('lp.subscribe', [ 0, .2, 'abc', 'test' ] => 'lp');
+        my $list = subscribe_r(0, .2, 'abc', 'test');
         note 'replica received task';
         is $list->iter->count, 2, '2 items';
 
