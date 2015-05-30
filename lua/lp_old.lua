@@ -87,10 +87,10 @@ return {
                 end
                 local tuple = {
                     event[ID],
-                    key[1], key[2], key[3], key[4], key[5]
+                    key[1], key[2], key[3], key[4], key[5],
+                    rtype,
+                    klen
                 }
-                table.insert(tuple, rtype)
-                table.insert(tuple, klen)
                 if i == #events then
                     table.insert(tuple, box.pack('l', box.time64()))
                     table.insert(tuple, event[1])       -- min ID
