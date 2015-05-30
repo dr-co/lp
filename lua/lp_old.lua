@@ -71,22 +71,29 @@ return {
             for i, event in pairs(events) do
                 local key
                 local klen
-                if #event == 1 then
+                local rtype
+                -- last element contains max, min id
+                if i == #events then
                     key = { '', '', '', '', '' }
                     klen = 0
+                    rtype = 't'
                 else
                     key = strsplit(event[KEY], '::')
                     klen = #key
+                    rtype = 'e'
                     while #key < 5 do
                         table.insert(key, '')
                     end
                 end
-                local tuple = { event[ID], unpack(key) }
-                table.insert(tuple, 'e')
+                local tuple = {
+                    event[ID],
+                    key[1], key[2], key[3], key[4], key[5]
+                }
+                table.insert(tuple, rtype)
                 table.insert(tuple, klen)
-                if #event == 1 then
+                if i == #events then
                     table.insert(tuple, box.pack('l', box.time64()))
-                    tuple[7] = 't'
+                    table.insert(tuple, event[1])       -- min ID
                 else
                     table.insert(tuple,
                         box.pack('l', 1000000 * box.unpack('i', event[TIME])))

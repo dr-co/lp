@@ -25,6 +25,15 @@ return {
         local last_id
         local last_checked_id = tonumber64(0)
 
+
+        first_id = function()
+            local min = box.space[space].index[0]:min()
+            if min == nil then
+                return 0
+            end
+            return box.unpack('l', min[ID])
+        end
+
         last_id = function()
             local max = box.space[space].index[0]:max()
             if max == nil then
@@ -196,7 +205,10 @@ return {
             if #events > 0 then
                 table.insert(
                     events,
-                    box.tuple.new{ box.pack('l', last_id() + tonumber64(1)) }
+                    box.tuple.new{
+                        box.pack('l', last_id() + tonumber64(1)),
+                        box.pack('l', first_id())    
+                    }
                 )
                 return events
             end
@@ -253,7 +265,10 @@ return {
             end
 
             -- last tuple always contains time
-            table.insert(events, box.tuple.new{ box.pack('l', id) })
+            table.insert(events, box.tuple.new{
+                box.pack('l', id),
+                box.pack('l', first_id())    
+            })
             return events
         end
 

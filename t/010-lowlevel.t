@@ -216,7 +216,7 @@ note 'old interface';
     my $tpcto = $tnt->call_lua(
         'lp.take', [ $tp->id + 2, .1, 2 => 'abc', 'cde' ], 'old_lp');
     
-    is $tpcto->data, undef, 'data (timeout)';
+    is unpack('Q<', $tpcto->data), 3, 'data (timeout)';
     is $tpcto->type, 't', 'type (timeout)';
     is $tpcto->klen, 0, 'key length (timeout)';
     is $tpcto->iter->count, 1, 'count of events (timeout)';
@@ -233,7 +233,7 @@ note 'old interface';
     my $tpcto = $tnt->call_lua(
         'lp.take', [ $tp->id + 2, .1, 2 => 'ab', 'cde' ], 'old_lp');
     
-    is $tpcto->data, undef, 'data (timeout)';
+    is unpack('Q<', $tpcto->data), 3, 'data (timeout)';
     is $tpcto->type, 't', 'type (timeout)';
     is $tpcto->klen, 0, 'key length (timeout)';
     is $tpcto->iter->count, 1, 'count of events (timeout)';
