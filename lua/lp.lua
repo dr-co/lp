@@ -196,7 +196,8 @@ return {
             id = tonumber64(id)
 
             -- Инициализация: если 0 - сразу возвращаем ID/MinID
-            if id == tonumber64(0) then
+            -- Если id потерялся, то сразу отвечаем проблемой
+            if id == tonumber64(0) or id < first_id() then
                 return {
                     box.tuple.new{
                         box.pack('l', last_id() + tonumber64(1)),
