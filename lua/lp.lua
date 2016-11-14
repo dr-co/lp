@@ -1,3 +1,105 @@
+local ID        = 1
+local CREATED   = 2
+local KEY       = 3
+local DATA      = 4
+
+local log = require 'log'
+local fiber = require 'fiber'
+local lp = {
+    VERSION         = '1.0',
+
+    defaults        = {
+        expire_timeout      = 1800,
+    },
+
+    private     = {
+        migrations  = require('lp.migrations'),
+        _last_id    = nil
+    }
+}
+
+
+function lp._extend(self, t1, t2)
+    local res = {}
+    if t1 ~= nil then
+        for k, v in pairs(t1) do
+            res[k] = v
+        end
+    end
+
+    if t2 ~= nil then
+        for k, v in pairs(t2) do
+            if res[k] ~= nil and v ~= nil and type(res[k]) ~= type(v) then
+                box.error(box.error.PROC_LUA,
+                    string.format(
+                        'Wrong type for ".%s": %s (have to be %s)',
+                            tostring(k),
+                            type(v),
+                            type(res[k])
+                    )
+                )
+            end
+            res[k] = v
+        end
+    end
+    return res
+end
+
+
+function lp._last_id(self)
+    return 1
+end
+        
+function lp._last_id(self)
+    local max = box.space.LP.index.id:max()
+    if max == nil then
+        self.private._last_id = tonumber64(1)
+    else
+        self.private._last_id = max[ID]
+    end
+    return self.private._last_id
+end
+
+
+function lp._put_task(self, key, data)
+    local time = fiber.time()
+    return box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
+end
+
+-------------------------------------------------------------------------------
+-- Public API
+-------------------------------------------------------------------------------
+
+function lp.push(self, key, data)
+    return self:_put_task(key, data)
+end
+
+function lp.push_list(self, ...)
+    local put = {...}
+    local i = 1
+    local count = 0
+    
+    while i <= #put do
+        local key = put[ i ]
+        local data = put[ i + 1 ]
+        i = i + 2
+        count = count + 1
+        self:_put_task(key, data)
+    end
+
+    return count
+end
+
+function lp.init(self, defaults)
+    self.defaults = self:_extend(self.defaults, defaults)
+    local upgrades = self.private.migrations:upgrade(self)
+    log.info('LP started')
+
+    return upgrades
+end
+return lp
+
+--[[
 require 'on_lsn'
 return {
     new = function(space, expire_timeout)
@@ -347,3 +449,5 @@ return {
         return self
     end
 }
+]]
+
