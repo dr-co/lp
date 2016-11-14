@@ -5,7 +5,7 @@ local DATA      = 4
 
 local log = require 'log'
 local fiber = require 'fiber'
-local json = require 'json'
+local msgpack = require 'msgpack'
 
 
 local lp = {
@@ -13,7 +13,7 @@ local lp = {
 
     defaults = {
         expire_timeout      = 1800,
-        serialize_key       = false,
+        serialize_key       = true,
     },
 
     private     = {
@@ -84,7 +84,7 @@ end
 
 function lp:_put_task(key, data)
     if self.opts.serialize_key then
-        key = json.encode(key)
+        key = msgpack.encode(key)
     end
     local time = fiber.time()
     local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
@@ -97,7 +97,8 @@ function lp:_put_task(key, data)
     end
 
     if self.opts.serialize_key then
-        return task:transform(KEY, 1, json.decode(task[KEY]))
+        key = msgpack.decode(task[KEY])
+        return task:transform(KEY, 1, key)
     else
         return task
     end
@@ -119,7 +120,8 @@ function lp:_take(id, keys)
     local result = {}
     for _, tuple in pairs(res) do
         if self.opts.serialize_key then
-            table.insert(result, tuple:transform(KEY, 1, json.decode(tuple[KEY])))
+            local key = msgpack.decode(tuple[KEY])
+            table.insert(result, tuple:transform(KEY, 1, key))
         else
             table.insert(result, tuple)
         end
@@ -199,7 +201,7 @@ function lp:subscribe(id, timeout, ...)
     local keys = {}
     for i, k in pairs(pkeys) do
         if self.opts.serialize_key then
-            table.insert(keys, json.encode(k))
+            table.insert(keys, msgpack.encode(k))
         else
             table.insert(keys, k)
         end
