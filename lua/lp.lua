@@ -13,7 +13,7 @@ local lp = {
 
     defaults = {
         expire_timeout      = 1800,
-        serialize_key       = true,
+        serialize_key       = false,
     },
 
     private     = {
