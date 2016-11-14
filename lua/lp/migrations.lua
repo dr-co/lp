@@ -59,7 +59,7 @@ migrations.list = {
         description = 'Create fetch LP index',
         up = function()
             box.space.LP:create_index(
-                'fetch',
+                'subscribe',
                 {
                     unique  = false,
                     type    = 'tree',

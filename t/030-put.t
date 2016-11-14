@@ -24,7 +24,6 @@ test:ok(task2, 'task was put again')
 
 test:is(task2[1], task[1] + 1, 'autoincrement id')
 
-
 local task3 = lp:push('key')
 test:ok(task3, 'task with no data was put')
 test:is(task3[1], task2[1] + 1, 'autoincrement id')
