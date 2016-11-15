@@ -15,21 +15,21 @@ local lp = {
         expire_timeout          = 1800,
         serialize_key_method    = 'none',
         lsn_check_interval      = 1,
-        run_expired             = true
+        mode                    = 'master',
     },
 
     private     = {
         migrations      = require('lp.migrations'),
-        processed_id    = 0,
         waiter          = {},
 
         cond_run        = { instance = true, fiber = {} },
 
         first_id        = nil,
         last_id         = nil,
+        processed_id    = nil,
     },
 }
-    
+
 lp.private._pack = pack_key.none.pack
 lp.private._unpack = pack_key.none.unpack
 
@@ -68,11 +68,11 @@ function lp:_last_id()
     else
         res = tonumber64(0)
     end
-    
+
     if self.private.last_id == nil then
         self.private.last_id = res
     end
-    
+
     if self.private.last_id < res then
         self.private.last_id = res
     end
@@ -81,12 +81,11 @@ function lp:_last_id()
 end
 
 function lp:_first_id()
-    if self.private.first_id ~= nil then
-        return self.private.first_id
-    end
     local min = box.space.LP.index.id:min()
     if min == nil then
-        self.private.first_id = 0
+        if self.private.first_id == nil then
+            self.private.first_id = 0
+        end
     else
         self.private.first_id = min[ID]
     end
@@ -100,11 +99,11 @@ function lp:_put_task(key, data)
     local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
 
     -- wakeup lsn fiber if it sleeps
-    if self.private.cond_run.fiber.lsn ~= nil then
-        local fid = self.private.cond_run.fiber.lsn
-        self.private.cond_run.fiber.lsn = nil
-        fiber.find(fid):wakeup()
-    end
+--     if self.private.cond_run.fiber.lsn ~= nil then
+--         local fid = self.private.cond_run.fiber.lsn
+--         self.private.cond_run.fiber.lsn = nil
+--         fiber.find(fid):wakeup()
+--     end
 
     return task:transform(KEY, 1, self.private._unpack(task[KEY]))
 end
@@ -140,42 +139,84 @@ function lp:_wakeup_consumers(key)
             for _, k in pairs(keys) do
                 self.private.waiter[k][fid] = nil
             end
+            log.info('wakeup consumer %s <<<<<<<<<', fid)
             fiber.find(fid):wakeup()
         end
     end
 end
 
+
 function lp:_lsn_fiber()
     local cond = self.private.cond_run
     fiber.create(function()
+        fiber.name('LP-lsn')
+        self.private.processed_id = self:_last_id()
+        
+        log.info(
+            'LP: fiber `lsn` started (last_id = %s)',
+            self.private.processed_id
+        )
+
+        local pause = self.opts.lsn_check_interval
+
+        local json = require 'json'
         while cond.instance do
-            if box.info.server.lsn ~= self.private.lsn then
-                self.private.lsn = box.info.server.lsn
+            local lsn = tonumber64(0)
+            for _, lsn_s in pairs(box.info.vclock) do
+                lsn = lsn + tonumber64(lsn_s)
+            end
+            if self.opts.mode ~= 'master' then
+                -- update last_id
+                self:_last_id()
+            end
+
+            if self.private.lsn ~= lsn then
+                self.private.lsn = lsn
 
                 while true do
-                    local task = box.space.LP:get(self.private.processed_id + tonumber64(1))
-                    if not task then
-                        break
+                    local task = box.space.LP:get(
+                        self.private.processed_id + tonumber64(1)
+                    )
+                    if task then
+                        self.private.processed_id = task[ID]
+                        self:_wakeup_consumers(task[KEY])
+                    else
+                        if self.private.processed_id == self:_last_id() then
+                            break
+                        end
+                        self.private.processed_id =
+                            self.private.processed_id + tonumber64(1)
                     end
-                    self.private.processed_id = task[ID]
-                    self:_wakeup_consumers(task[KEY])
                 end
             end
 
             cond.fiber.lsn = fiber.id()
-            fiber.sleep(self.opts.lsn_check_interval)
+            fiber.sleep(pause)
+            if cond.fiber.lsn then
+                pause = self.opts.lsn_check_interval
+            else
+                -- someone woke up us
+                -- on_replace - is BEFORE trigger
+                pause = 0.05
+                if pause > self.opts.lsn_check_interval then
+                    pause = self.opts.lsn_check_interval
+                end
+            end
             cond.fiber.lsn = nil
         end
     end)
 end
 
 function lp:_expire_fiber()
-    if not self.opts.run_expired then
-        log.info('LP: expired is disabled')
+    if self.opts.mode ~= 'master' then
+        log.info('LP: expired is disabled: mode=%s', self.opts.mode)
         return
     end
+
     local cond = self.private.cond_run
     fiber.create(function()
+        fiber.name('LP-expired')
+        log.info('LP: fiber `expired` started')
         while cond.instance do
             local pause
             local task = box.space.LP.index.id:min()
@@ -204,7 +245,7 @@ end
 -------------------------------------------------------------------------------
 
 function lp:subscribe(id, timeout, ...)
-    
+
     local pkeys = {...}
 
     local keys = {}
@@ -293,12 +334,25 @@ function lp.push_list(self, ...)
     return count
 end
 
-function lp.init(self, defaults)
+function lp:init(defaults)
     local opts = self:_extend(self.defaults, defaults)
 
     self.opts = opts
-    local upgrades = self.private.migrations:upgrade(self)
-    log.info('LP started')
+    local upgrades = 0
+
+    if self.opts.mode == 'master' then
+        upgrades = self.private.migrations:upgrade(self)
+    else
+        while not box.space.LP do
+            log.info('Wait for master process will create space')
+            fiber.sleep(2)
+        end
+    end
+    log.info('LP (%s) started', self.opts.mode)
+
+    for _, trg in pairs(box.space.LP:on_replace()) do
+        box.space.LP:on_replace(nil, trg)
+    end
 
     -- stop old fibers
     self.private.cond_run.instance = false
@@ -320,6 +374,19 @@ function lp.init(self, defaults)
 
     -- start lsn fiber
     self:_lsn_fiber()
+
+    box.space.LP:on_replace(function(old, new)
+        local fid = self.private.cond_run.fiber.lsn
+
+        -- delete tuple
+        if old ~= nil and new == nil then
+            self.private.first_id = old[ID] + tonumber64(1)
+        end
+        if fid then
+            self.private.cond_run.fiber.lsn = nil
+            fiber.find(fid):wakeup()
+        end
+    end)
 
     -- start expire fiber
     self:_expire_fiber()
