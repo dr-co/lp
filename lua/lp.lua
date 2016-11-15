@@ -5,15 +5,15 @@ local DATA      = 4
 
 local log = require 'log'
 local fiber = require 'fiber'
-local msgpack = require 'msgpack'
+local pack_key = require 'lp.pack_key'
 
 
 local lp = {
     VERSION                 = '1.0',
 
     defaults = {
-        expire_timeout      = 1800,
-        serialize_key       = false,
+        expire_timeout          = 1800,
+        serialize_key_method    = 'none',
     },
 
     private     = {
@@ -25,9 +25,12 @@ local lp = {
 
         first_id        = nil,
         last_id         = nil,
-    }
-}
 
+    },
+}
+    
+lp.private._pack = pack_key.none.pack
+lp.private._unpack = pack_key.none.unpack
 
 function lp:_extend(t1, t2)
     local res = {}
@@ -83,9 +86,7 @@ end
 
 
 function lp:_put_task(key, data)
-    if self.opts.serialize_key then
-        key = msgpack.encode(key)
-    end
+    key = self.private._pack(key)
     local time = fiber.time()
     local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
 
@@ -96,12 +97,14 @@ function lp:_put_task(key, data)
         fiber.find(fid):wakeup()
     end
 
-    if self.opts.serialize_key then
-        key = msgpack.decode(task[KEY])
-        return task:transform(KEY, 1, key)
-    else
-        return task
+    -- wakeup lsn fiber if it sleeps
+    if self.private.cond_run.fiber.lsn ~= nil then
+        local fid = self.private.cond_run.fiber.lsn
+        self.private.cond_run.fiber.lsn = nil
+        fiber.find(fid):wakeup()
     end
+
+    return task:transform(KEY, 1, self.private._unpack(task[KEY]))
 end
 
 function lp:_take(id, keys)
@@ -119,12 +122,8 @@ function lp:_take(id, keys)
     table.sort(res, function(a, b) return a[1] < b[1] end)
     local result = {}
     for _, tuple in pairs(res) do
-        if self.opts.serialize_key then
-            local key = msgpack.decode(tuple[KEY])
-            table.insert(result, tuple:transform(KEY, 1, key))
-        else
-            table.insert(result, tuple)
-        end
+        table.insert(result,
+            tuple:transform(KEY, 1, self.private._unpack(tuple[KEY])))
     end
     return result
 end
@@ -161,7 +160,9 @@ function lp:_lsn_fiber()
                 end
             end
 
-            fiber.sleep(0.1)
+            cond.fiber.lsn = fiber.id()
+            fiber.sleep(1)
+            cond.fiber.lsn = nil
         end
     end)
 end
@@ -200,11 +201,7 @@ function lp:subscribe(id, timeout, ...)
 
     local keys = {}
     for i, k in pairs(pkeys) do
-        if self.opts.serialize_key then
-            table.insert(keys, msgpack.encode(k))
-        else
-            table.insert(keys, k)
-        end
+        table.insert(keys, self.private._pack(k))
     end
 
     id = tonumber64(id)
@@ -289,7 +286,9 @@ function lp.push_list(self, ...)
 end
 
 function lp.init(self, defaults)
-    self.opts = self:_extend(self.defaults, defaults)
+    local opts = self:_extend(self.defaults, defaults)
+
+    self.opts = opts
     local upgrades = self.private.migrations:upgrade(self)
     log.info('LP started')
 
@@ -298,6 +297,15 @@ function lp.init(self, defaults)
     for _, fid in pairs(self.private.cond_run.fiber) do
         fiber.find(fid):wakeup()
     end
+
+
+    if pack_key[self.opts.serialize_key_method] == nil then
+        self.opts.serialize_key_method = 'none'
+    end
+    log.info('LP: use "%s" method to pack key', self.opts.serialize_key_method)
+    self.private._pack = pack_key[self.opts.serialize_key_method].pack
+    self.private._unpack = pack_key[self.opts.serialize_key_method].unpack
+
 
     -- condition for new fibers
     self.private.cond_run = { instance = true, fiber = {} }
