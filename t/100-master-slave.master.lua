@@ -37,8 +37,7 @@ local net = require 'net.box'
 local yaml = require 'yaml'
 
 local test = require('tap').test()
-test:plan(11)
-
+test:plan(16)
 
 
 
@@ -85,9 +84,16 @@ test:is(#list2, 1, 'expired removed task')
 
 test:is(list2[1][1], list2[1][2], 'min_id = last_id')
 
+test:is_deeply(box.space.LP:select(), {}, 'empty space')
 
 
-
+test:is(lp:push_list('key1', 'value1', 'key2', 'value2', 'key3', 'value3'), 3,
+    '3 tasks were put')
+started = fiber.time()
+local list3 = replica:call('lp:subscribe', 1, 0.1, 'key2')
+test:is(#list, 2, 'one task received from replica')
+test:is(list[1][4], 'value2', 'task data')
+test:ok(fiber.time() - started < 0.1, 'wakeup fiber by trigger on_replace')
 
 
 os.exit(test:check() == true and 0 or -1)
