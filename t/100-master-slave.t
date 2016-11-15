@@ -63,7 +63,8 @@ if ($master_pid = open my $out, '-|', tarantool => $master_lua) {
 END {
     for ($replica_pid, $master_pid) {
         next unless $_;
-        kill KILL => $_;
+        kill TERM => $_;
+        waitpid $_, 0;
         $_ = undef;
     }
 

@@ -7,7 +7,6 @@ local log = require 'log'
 local fiber = require 'fiber'
 local pack_key = require 'lp.pack_key'
 
-
 local lp = {
     VERSION                 = '1.0',
 
@@ -93,20 +92,6 @@ function lp:_first_id()
 end
 
 
-function lp:_put_task(key, data)
-    key = self.private._pack(key)
-    local time = fiber.time()
-    local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
-
-    -- wakeup lsn fiber if it sleeps
---     if self.private.cond_run.fiber.lsn ~= nil then
---         local fid = self.private.cond_run.fiber.lsn
---         self.private.cond_run.fiber.lsn = nil
---         fiber.find(fid):wakeup()
---     end
-
-    return task:transform(KEY, 1, self.private._unpack(task[KEY]))
-end
 
 function lp:_take(id, keys)
     id = tonumber64(id)
@@ -139,7 +124,6 @@ function lp:_wakeup_consumers(key)
             for _, k in pairs(keys) do
                 self.private.waiter[k][fid] = nil
             end
-            log.info('wakeup consumer %s <<<<<<<<<', fid)
             fiber.find(fid):wakeup()
         end
     end
@@ -233,7 +217,7 @@ function lp:_expire_fiber()
             else
                 pause = self.opts.expire_timeout
             end
-            if pause ~= nil then
+            if pause then
                 fiber.sleep(pause)
             end
         end
@@ -315,7 +299,10 @@ function lp:subscribe(id, timeout, ...)
 end
 
 function lp.push(self, key, data)
-    return self:_put_task(key, data)
+    key = self.private._pack(key)
+    local time = fiber.time()
+    local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
+    return task:transform(KEY, 1, self.private._unpack(task[KEY]))
 end
 
 function lp.push_list(self, ...)
@@ -328,7 +315,7 @@ function lp.push_list(self, ...)
         local data = put[ i + 1 ]
         i = i + 2
         count = count + 1
-        self:_put_task(key, data)
+        self:push(key, data)
     end
 
     return count

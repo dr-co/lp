@@ -3,7 +3,7 @@
 local yaml = require 'yaml'
 local test = require('tap').test()
 local fiber = require 'fiber'
-test:plan(5)
+test:plan(6)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -42,7 +42,32 @@ test:test('take timeout', function(test)
 end)
 
 
+test:test('some keys', function(test) 
 
+    box.space.LP:truncate()
+
+    test:plan(3)
+    test:is(
+        lp:push_list(
+            'key1', 'value1',
+            'key2', 'value2',
+            'key3', 'value3'
+        ),
+        3,
+        '3 tasks were put')
+
+    local list = lp:subscribe(1, 0.1, 'key2')
+    test:is(#list, 1, 'no one event was fetched')
+
+    list = lp:subscribe(list[1][2], 0.1, 'key2')
+    test:is(#list, 2, 'no one event was fetched')
+
+    
+
+end)
+
+-- test:diag(yaml.encode(box.space.LP:select()))
+-- test:diag(tnt.log())
 tnt.finish()
 os.exit(test:check() == true and 0 or -1)
 

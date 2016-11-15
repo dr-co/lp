@@ -1,5 +1,7 @@
 #!/usr/bin/env tarantool
 
+local PLAN      = 18
+
 local MASTER_PORT = tonumber(os.getenv('MASTER_PORT'))
 local REPLICA_PORT = tonumber(os.getenv('REPLICA_PORT'))
 local TEST_DIR = os.getenv('TEST_DIR')
@@ -37,7 +39,7 @@ local net = require 'net.box'
 local yaml = require 'yaml'
 
 local test = require('tap').test()
-test:plan(16)
+test:plan(PLAN)
 
 
 
@@ -87,14 +89,19 @@ test:is(list2[1][1], list2[1][2], 'min_id = last_id')
 test:is_deeply(box.space.LP:select(), {}, 'empty space')
 
 
+
+test:is(lp:init({ mode = 'master', expire_timeout = 500 }), 0, 'Reinit')
+
 test:is(lp:push_list('key1', 'value1', 'key2', 'value2', 'key3', 'value3'), 3,
     '3 tasks were put')
 started = fiber.time()
-local list3 = replica:call('lp:subscribe', 1, 0.1, 'key2')
-test:is(#list, 2, 'one task received from replica')
-test:is(list[1][4], 'value2', 'task data')
-test:ok(fiber.time() - started < 0.1, 'wakeup fiber by trigger on_replace')
 
+local list3 = replica:call('lp:subscribe', list2[#list2][2], .1, 'key2')
+
+test:is(#list3, 2, 'one task received from replica')
+test:is(list3[1][4], 'value2', 'task data')
+test:ok(fiber.time() - started < 0.1, 'wakeup fiber by trigger on_replace')
+test:is(list3[1][1], list2[1][1] + 1, 'id')
 
 os.exit(test:check() == true and 0 or -1)
 
