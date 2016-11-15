@@ -60,14 +60,22 @@ end
 
 function lp:_last_id()
     local max = box.space.LP.index.id:max()
+
+    local res
     if max ~= nil then
-        self.private.last_id = max[ID]
+        res = max[ID]
     else
-        -- empty space doesn't loose last_id
-        if self.private.last_id == nil then
-            self.private.last_id = tonumber64(0)
-        end
+        res = tonumber64(0)
     end
+    
+    if self.private.last_id == nil then
+        self.private.last_id = res
+    end
+    
+    if self.private.last_id < res then
+        self.private.last_id = res
+    end
+
     return self.private.last_id
 end
 
@@ -89,13 +97,6 @@ function lp:_put_task(key, data)
     key = self.private._pack(key)
     local time = fiber.time()
     local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
-
-    -- wakeup expire fiber if it sleeps
-    if self.private.cond_run.fiber.expire ~= nil then
-        local fid = self.private.cond_run.fiber.expire
-        self.private.cond_run.fiber.expire = nil
-        fiber.find(fid):wakeup()
-    end
 
     -- wakeup lsn fiber if it sleeps
     if self.private.cond_run.fiber.lsn ~= nil then
@@ -171,22 +172,24 @@ function lp:_expire_fiber()
     local cond = self.private.cond_run
     fiber.create(function()
         while cond.instance do
-            local pause = 3600
+            local pause
             local task = box.space.LP.index.id:min()
             if task ~= nil then
                 pause = fiber.time() - task[CREATED]
                 pause = pause - self.opts.expire_timeout
                 if pause >= 0 then
+                    self.private.first_id = tonumber64(task[ID]) + tonumber64(1)
                     box.space.LP:delete(task[ID])
-                    pause = 0
+                    pause = nil
                 else
                     pause = -pause
                 end
             else
-                cond.fiber.expire = fiber.id()
+                pause = self.opts.expire_timeout
             end
-            fiber.sleep(pause)
-            cond.fiber.expire = nil
+            if pause ~= nil then
+                fiber.sleep(pause)
+            end
         end
     end)
 end
