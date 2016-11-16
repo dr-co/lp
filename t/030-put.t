@@ -2,7 +2,7 @@
 
 local yaml = require 'yaml'
 local test = require('tap').test()
-test:plan(9)
+test:plan(11)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -31,6 +31,12 @@ test:isnil(task3[4], 'data is nil')
 
 local cnt = lp:push_list('key1', 'data1', 'key2', 'data2')
 test:is(cnt, 2, 'tuples inserted')
+
+task = lp('push', 'a', 'b')
+test:ok(task, 'call-style push')
+
+count = lp('push_list', 'a', 'b', 'c', 'd', 'e')
+test:is(count, 3, 'push_list')
 
 tnt.finish()
 os.exit(test:check() == true and 0 or -1)

@@ -9,6 +9,7 @@ local pack_key = require 'lp.pack_key'
 
 local lp = {
     VERSION                 = '1.0',
+    _is_lp                  = true,
 
     defaults = {
         expire_timeout          = 1800,
@@ -229,6 +230,10 @@ end
 -------------------------------------------------------------------------------
 
 function lp:subscribe(id, timeout, ...)
+    
+    if not ('table' == type(self) and self._is_lp) then
+        box.error(box.error.PROC_LUA, 'usage lp:subscribe(id, timeout, key1[, ... ]')
+    end
 
     local pkeys = {...}
 
@@ -298,14 +303,23 @@ function lp:subscribe(id, timeout, ...)
     return events
 end
 
-function lp.push(self, key, data)
+function lp:push(key, data)
+    if not ('table' == type(self) and self._is_lp) then
+        box.error(box.error.PROC_LUA, 'usage lp:push(key[, data])')
+    end
+
     key = self.private._pack(key)
     local time = fiber.time()
     local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
     return task:transform(KEY, 1, self.private._unpack(task[KEY]))
 end
 
-function lp.push_list(self, ...)
+function lp:push_list(...)
+    
+    if not ('table' == type(self) and self._is_lp) then
+        box.error(box.error.PROC_LUA, 'usage lp:push_list(key[, data][,...])')
+    end
+    
     local put = {...}
     local i = 1
     local count = 0
@@ -322,6 +336,11 @@ function lp.push_list(self, ...)
 end
 
 function lp:init(defaults)
+    
+    if not ('table' == type(self) and self._is_lp) then
+        box.error(box.error.PROC_LUA, 'usage lp:init{...}')
+    end
+    
     local opts = self:_extend(self.defaults, defaults)
 
     self.opts = opts
@@ -395,7 +414,23 @@ for k, v in pairs(lp) do
         public[k] = v
     end
 end
-setmetatable(public, { __index = private })
+
+local call_methods = {
+    push        = true,
+    push_list   = true,
+    subscribe   = true,
+    init        = true
+}
+
+setmetatable(public, {
+    __index = private,
+    __call = function(self, method, ...)
+        if call_methods[method] then
+            return self[method](self, ...)
+        end
+        box.error(box.error.PROC_LUA, 'usage: lp(method, args...)')
+    end
+})
 
 return public
 
