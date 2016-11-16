@@ -13,7 +13,7 @@ sub free_port {
     for (1 .. 1000) {
         my $s = IO::Socket::INET->new(
             Listen      => 1,
-            ReusePort   => 1,
+#             ReusePort   => 1,
         );
         next unless $s;
         my $port = $s->sockport;
