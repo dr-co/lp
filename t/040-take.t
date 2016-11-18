@@ -3,7 +3,7 @@
 local yaml = require 'yaml'
 local test = require('tap').test()
 local fiber = require 'fiber'
-test:plan(6)
+test:plan(7)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -43,7 +43,6 @@ end)
 
 
 test:test('some keys', function(test) 
-
     box.space.LP:truncate()
 
     test:plan(3)
@@ -60,9 +59,60 @@ test:test('some keys', function(test)
     test:is(#list, 1, 'no one event was fetched')
 
     list = lp:subscribe(list[1][2], 0.1, 'key2')
-    test:is(#list, 2, 'no one event was fetched')
+    test:is(#list, 2, 'one event was fetched')
+end)
 
+test:test('take after sleep', function(test)
     
+    test:plan(12)
+
+    test:diag(lp:_last_id())
+
+    local count = 0
+    fiber.create(function()
+        count = count + 1
+        local list = lp:subscribe(lp:_last_id(), 2, 'a', 'b', 'c')
+        test:is(#list, 2, 'event received')
+        count = count + 10
+        test:is(list[1][3], 'a', 'key')
+        test:is(list[1][4], 'da', 'data')
+    end)
+    
+    fiber.create(function()
+        count = count + 1
+        local list = lp:subscribe(lp:_last_id(), 2, 'd', 'e', 'f')
+        test:is(#list, 2, 'event received')
+        count = count + 10
+        test:is(list[1][3], 'e', 'key')
+        test:is(list[1][4], 'de', 'data')
+    end)
+    
+    fiber.create(function()
+        count = count + 1
+        local list = lp:subscribe(lp:_last_id(), 2, 'g', 'h', 'i')
+        test:is(#list, 2, 'event received')
+        count = count + 10
+        test:is(list[1][3], 'i', 'key')
+        test:is(list[1][4], 'di', 'data')
+    end)
+
+
+    local started = fiber.time()
+    fiber.sleep(0.2)
+    test:is(count, 3, 'all fibers started')
+    lp:push('a', 'da')
+    lp:push('e', 'de')
+    lp:push('i', 'di')
+
+    for i = 1, 10 do
+        if count == 33 then
+            break
+        end
+
+        fiber.sleep(0.09)
+    end
+    test:ok(fiber.time() - started >= 0.2, 'time lo')
+    test:ok(fiber.time() - started <= 0.5, 'time hi')
 
 end)
 
