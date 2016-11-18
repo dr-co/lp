@@ -298,7 +298,7 @@ function lp:subscribe(id, timeout, ...)
 
     table.insert(
         events,
-        box.tuple.new{ self:_last_id() + tonumber64(1), self:_first_id() }
+        box.tuple.new{ id, self:_first_id() }
     )
     return events
 end

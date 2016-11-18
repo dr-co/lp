@@ -3,7 +3,7 @@
 local yaml = require 'yaml'
 local test = require('tap').test()
 local fiber = require 'fiber'
-test:plan(7)
+test:plan(8)
 
 local tnt = require('t.tnt')
 test:ok(tnt, 'tarantool loaded')
@@ -113,6 +113,43 @@ test:test('take after sleep', function(test)
     end
     test:ok(fiber.time() - started >= 0.2, 'time lo')
     test:ok(fiber.time() - started <= 0.5, 'time hi')
+
+end)
+
+
+test:test('id > _last_id', function(test)
+    test:plan(7)
+
+    local id = lp:_last_id() + tonumber(10)
+
+    local list = lp:subscribe(id, 0.1, 'a', 'b', 'c')
+    test:is(#list, 1, 'no tasks were taken')
+    test:is(list[1][1], id, 'id was not changed')
+
+
+    id = lp:_last_id() + tonumber(1)
+
+    local fiber_run = false
+    local fiber_done = false
+    fiber.create(function()
+        fiber_run = true
+        local list = lp:subscribe(id, 2, 'a', 'b', 'c')
+        test:is(#list, 2, 'one task was taken')
+        test:is(list[1][1], id, 'id')
+        test:is(list[1][4], 'd', 'data')
+        fiber_done = true
+    end)
+
+    fiber.sleep(0.1)
+    test:ok(fiber_run, 'fiber is run')
+    lp:push('c', 'd')
+    for i = 1, 10 do
+        fiber.sleep(0.1)
+        if fiber_done then
+            break
+        end
+    end
+    test:ok(fiber_done, 'fiber is done')
 
 end)
 
