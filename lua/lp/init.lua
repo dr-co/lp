@@ -324,6 +324,7 @@ function lp:push_list(...)
     local i = 1
     local count = 0
 
+    box.begin()
     while i <= #put do
         local key = put[ i ]
         local data = put[ i + 1 ]
@@ -331,6 +332,7 @@ function lp:push_list(...)
         count = count + 1
         self:push(key, data)
     end
+    box.commit()
 
     return count
 end
