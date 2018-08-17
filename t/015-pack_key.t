@@ -7,13 +7,14 @@ package.path = string.format('%s;%s',
     'lua/?.lua;lua/?/init.lua',
     package.path
 )
+local msgpack = require 'msgpack'
 
 local pk = require 'lp.pack_key'
 
 
 function check_method(m) 
     test:test(m .. ' method', function(test) 
-        test:plan(3)
+        test:plan(5)
 
         test:ok(pk[m].pack('abc'), m .. ': pack scalar')
         test:ok(pk[m].pack({'abc'}), m .. ': pack table')
@@ -22,6 +23,22 @@ function check_method(m)
             'abc',
             m .. ': pack/unpack table'
         )
+
+        test:ok(pk[m].pack{ 'abc', msgpack.NULL }, 'pack null')
+        if m == 'colon' then
+            test:diag(pk[m].pack{'abc', msgpack.NULL})
+            test:is_deeply(
+                pk[m].unpack(pk[m].pack{'abc', msgpack.NULL}),
+                { 'abc', 'null' },
+                m .. ': pack/unpack table'
+            )
+        else
+            test:is_deeply(
+                pk[m].unpack(pk[m].pack{'abc', msgpack.NULL}),
+                { 'abc', msgpack.NULL },
+                m .. ': pack/unpack table'
+            )
+        end
     end)
 end
 

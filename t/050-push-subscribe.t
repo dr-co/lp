@@ -28,7 +28,7 @@ test:test('take sleep', function(test)
     local started = fiber.time()
     local list = lp:subscribe(1, 1, 'key')
     test:ok(fiber.time() - started >= 0.15, 'delay lo')
-    test:ok(fiber.time() - started <= 0.25, 'delay hi')
+    test:ok(fiber.time() - started <= 0.35, 'delay hi')
     test:is(#list, 2, 'one event was fetch immediattely')
     test:is(list[1][4], 'value', 'event data')
 

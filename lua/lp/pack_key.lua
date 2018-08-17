@@ -34,7 +34,15 @@ return {
     colon = {
         pack = function(key)
             if type(key) == 'table' then
-                return table.concat(key, ':')
+                local res = {}
+                for _, v in pairs(key) do
+                    if v == nil then
+                        table.insert(res, 'null')
+                    else
+                        table.insert(res, tostring(v))
+                    end
+                end
+                return table.concat(res, ':')
             end
             return key .. ':'
         end,

@@ -14,14 +14,14 @@ box.cfg {
     listen      = REPLICA_PORT,
 
     wal_dir     = dir,
-    snap_dir    = dir,
+    memtx_dir    = dir,
     vinyl_dir   = dir,
 
-    replication_source  = {
+    replication  = {
         string.format('%s:%s@localhost:%s', 'test', 'test', MASTER_PORT)
     },
 
-    logger     = fio.pathjoin(dir, 'tarantool.log'),
+    log     = fio.pathjoin(dir, 'tarantool.log'),
 }
 
 

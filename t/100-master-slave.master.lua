@@ -16,10 +16,10 @@ box.cfg {
     listen      = MASTER_PORT,
 
     wal_dir     = dir,
-    snap_dir    = dir,
+    memtx_dir    = dir,
     vinyl_dir   = dir,
 
-    logger     = fio.pathjoin(dir, 'tarantool.log'),
+    log     = fio.pathjoin(dir, 'tarantool.log'),
 }
 
 box.schema.user.create('test', { password = 'test' })
@@ -73,7 +73,7 @@ log.info('push task3')
 test:ok(lp:push('key3', 'value3'), 'push 3 task')
 
 local started = fiber.time()
-list = replica:call('lp:subscribe', 1, 3, 'key2')
+list = replica:call('lp:subscribe', { 1, 3, 'key2' })
 test:is(#list, 2, 'one task received from replica')
 test:is(list[1][4], 'value2', 'task data')
 test:ok(fiber.time() - started < 0.1, 'wakeup fiber by trigger on_replace')
@@ -81,7 +81,7 @@ test:ok(fiber.time() - started < 0.1, 'wakeup fiber by trigger on_replace')
 
 fiber.sleep(0.61)
 
-local list2 = replica:call('lp:subscribe', 1, 0.1, 'key2')
+local list2 = replica:call('lp:subscribe', { 1, 0.1, 'key2' })
 test:is(#list2, 1, 'expired removed task')
 
 test:is(list2[1][1], list2[1][2], 'min_id = last_id')
@@ -96,7 +96,7 @@ test:is(lp:push_list('key1', 'value1', 'key2', 'value2', 'key3', 'value3'), 3,
     '3 tasks were put')
 started = fiber.time()
 
-local list3 = replica:call('lp:subscribe', list2[#list2][2], .1, 'key2')
+local list3 = replica:call('lp:subscribe', { list2[#list2][2], .1, 'key2' })
 
 test:is(#list3, 2, 'one task received from replica')
 test:is(list3[1][4], 'value2', 'task data')

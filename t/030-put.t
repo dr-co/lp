@@ -1,6 +1,7 @@
 #!/usr/bin/env tarantool
 
 local yaml = require 'yaml'
+local msgpack = require 'msgpack'
 local test = require('tap').test()
 test:plan(11)
 
@@ -24,10 +25,10 @@ test:ok(task2, 'task was put again')
 
 test:is(task2[1], task[1] + 1, 'autoincrement id')
 
-local task3 = lp:push('key')
+local task3 = lp:push('key', msgpack.null)
 test:ok(task3, 'task with no data was put')
 test:is(task3[1], task2[1] + 1, 'autoincrement id')
-test:isnil(task3[4], 'data is nil')
+test:ok(task3[4] == nil, 'data is nil')
 
 local cnt = lp:push_list('key1', 'data1', 'key2', 'data2')
 test:is(cnt, 2, 'tuples inserted')

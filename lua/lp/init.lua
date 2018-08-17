@@ -6,6 +6,7 @@ local DATA      = 4
 local log = require 'log'
 local fiber = require 'fiber'
 local pack_key = require 'lp.pack_key'
+local msgpack = require 'msgpack'
 
 local lp = {
     VERSION                 = '1.0',
@@ -310,7 +311,15 @@ function lp:push(key, data)
 
     key = self.private._pack(key)
     local time = fiber.time()
-    local task = box.space.LP:insert{ self:_last_id() + 1, fiber.time(), key, data }
+    if data == nil then
+        data = msgpack.NULL
+    end
+    local task = box.space.LP:insert{
+        self:_last_id() + 1,
+        fiber.time(),
+        key,
+        data
+    }
     return task:transform(KEY, 1, self.private._unpack(task[KEY]))
 end
 
