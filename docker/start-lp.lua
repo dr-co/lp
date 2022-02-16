@@ -1,4 +1,6 @@
 box.cfg{}
-queue = require 'megaqueue'
-queue:init{}
+lp = require 'lp'
+lp:init {
+    serialize_key_method  = 'json',
+}
 

@@ -1,5 +1,5 @@
 package = 'lp'
-version = '@@VERSION@@'
+version = '1.0-2'
 source  = {
     url    = 'git+https://github.com/dr-co/lp',
     branch = 'master',

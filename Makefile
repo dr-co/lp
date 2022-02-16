@@ -70,5 +70,6 @@ docker-upload: # dockers
 .PHONY: \
 	all \
 	test \
-	update-spec
+	update-spec \
+	clean
 
