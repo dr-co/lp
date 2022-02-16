@@ -53,7 +53,7 @@ dockers:
 		; \
 	done
 
-docker-upload: # dockers
+docker-upload: dockers
 	@set -e; \
 	cd docker; \
 	for version in $(DOCKER_VERSIONS); do \
