@@ -9,7 +9,7 @@ local pack_key = require 'lp.pack_key'
 local msgpack = require 'msgpack'
 
 local lp = {
-    VERSION                 = '1.0',
+    VERSION                 = '1.0-1',
     _is_lp                  = true,
 
     defaults = {

@@ -1,0 +1,6 @@
+FROM tarantool/tarantool:@@VERSION@@
+WORKDIR /opt/lp
+COPY start-lp.lua /opt/lp
+RUN luarocks --to /opt/.rocks --local install lp
+RUN ln -s /opt/.rocks/share/lua/5.1/ /opt/.rocks/share/tarantool
+CMD [ "tarantool", "/opt/lp/start-lp.lua" ]

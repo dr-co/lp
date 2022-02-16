@@ -1,1 +1,3 @@
-nowtaxi-config/*
+lp-*.rockspec.prepare
+*.src.rock
+docker/Dockerfile
